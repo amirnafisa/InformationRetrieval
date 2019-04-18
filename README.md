@@ -1,6 +1,13 @@
 # InformationRetrieval
 Date: April 18, 2019
 
+Issues: 1. Removal of isolated punctuations needed before tagging or noun phrase extraction.
+        2. Multiple sentences in a line. (Using nltk sentence tokenizer)
+        3. find grammar rules for NP extraction.
+        4. Should we remove suffixes 's' or 'es' or 'd' or  'ed'???
+############################################################3
+Date: April 18, 2019
+
 Dataset: FIRE 2017 Legal information retrieval
 
 Task1: Catchphrase extraction (Train on 100 cases and test on 300 cases)
