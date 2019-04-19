@@ -5,6 +5,7 @@ Issues: 1. Removal of isolated punctuations needed before tagging or noun phrase
         2. Multiple sentences in a line. (Using nltk sentence tokenizer)
         3. find grammar rules for NP extraction.
         4. Should we remove suffixes 's' or 'es' or 'd' or  'ed'???
+        5. CBOW model from gensim is used currently, alternatives must be considered such as skip gram etc.
 ############################################################3
 Date: April 18, 2019
 
