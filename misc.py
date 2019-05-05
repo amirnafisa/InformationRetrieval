@@ -62,7 +62,7 @@ def get_noun_phrases(doc_tokens):
     noun_phrases = defaultdict(int)
     my_parser = nltk.RegexpParser (
             r"""
-                NP: {<DT|JJ|NN.*>+}          # Chunk sequences of DT, JJ, NN
+                NP: {<JJ|NN.*>+}             # Chunk sequences of JJ, NN
                 NP: {<NN>*<NNS>*<NNP>*}      # Chunk sequences of NN and NNS
             """
         )
@@ -112,6 +112,8 @@ def get_vector_embedding_for_NPs(vocab, phrases, model=True):
 def compute_centroid(vecs):
     return np.mean(vecs,axis=0)
 
+def compute_acc(Y_hat,Y):
+    return round(np.mean(Y_hat==Y), 4)
 
 def cosine_sim(x, y):
     '''
@@ -120,18 +122,6 @@ def cosine_sim(x, y):
     if norm(x) == 0 or norm(y) == 0:
         return 0
     return np.dot(x.T,y)/(norm(x) * norm(y))
-
-
-def Default(doc_vecs_tr, doc_vecs_tt, Y_tr):
-    centroid_profile1 = compute_centroid(doc_vecs_tr[Y_tr==1])
-    centroid_profile2 = compute_centroid(doc_vecs_tr[Y_tr==0])
-
-    dif = np.array([cosine_sim(vec, centroid_profile1)-cosine_sim(vec, centroid_profile2) for vec in doc_vecs_tt])
-
-    Y_hat = np.ones_like(dif)
-    Y_hat[dif <= 0] = 0
-    return Y_hat
-
 
 def get_vector_embedding(model, phrase):
 
@@ -152,10 +142,72 @@ def tmp_save(item, file):
         pickle.dump(item, fp, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-def tmp_load(file):
+def tmp_load(file, load):
+    if not load:
+        return None
     dir = 'tmp_files'
     file = os.path.join(dir,file+'.lst')
     if os.path.isfile(file):
         with open(file,'rb') as fp:
             return pickle.load(fp)
     return None
+
+def write_output(Y_test_hat,test_X_doc,test_set_of_NP_X,start_idx,ext='Train'):
+    print("Printing Task1 Outputs ...")
+
+    dir = 'output/'
+    if not os.path.exists(dir):
+        os.mkdir(dir)
+
+    dir = 'output/'+ext+'/'
+    if not os.path.exists(dir):
+        os.mkdir(dir)
+
+    print(Y_test_hat.shape)
+    for i in range(len(test_X_doc)):
+        f = open(dir+'case_'+str(int(i+start_idx))+'_catchwords.txt','w')
+
+        for noun_phrase in test_X_doc[i]:
+            j = test_set_of_NP_X.index(noun_phrase)
+
+            if Y_test_hat[j] == 1:
+                f.write(str(noun_phrase)+', ')
+        f.close()
+
+def evaluate_task1(start_idx, n_files, folder):
+    precision = np.zeros((n_files))
+    recall = np.zeros_like(precision)
+
+    for j in range(n_files):
+        i = j+start_idx
+        file_true = get_file_name(1, folder, 'catches', i)
+        file_hat = 'output/'+folder+'/case_'+str(i)+'_catchwords.txt'
+
+        with open(file_true) as f:
+            lines = f.readline()
+            list_true = set(lines.strip().lower().split(','))
+
+
+        with open(file_hat) as f:
+            lines = f.readline()
+            list_hat = set(lines.strip().lower().split(','))
+
+        precision[j], recall[j] = compute_prec_recall(list_true, list_hat)
+
+        print(j, precision[j], recall[j], sep='\t')
+
+    return precision, recall
+
+
+def compute_prec_recall(golden_truth, prediction):
+
+    common_set = set(golden_truth).intersection(set(prediction))
+    print(common_set)
+
+    precision = round(len(common_set)/len(prediction), 4)
+
+    recall = round(len(common_set)/len(golden_truth), 4)
+
+
+
+    return precision, recall
