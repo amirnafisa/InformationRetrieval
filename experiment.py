@@ -19,14 +19,14 @@ if __name__ == '__main__':
     tmp_save(Y_dev_hat, 'Y_dev_hat')
 
     #Compute training accuracy for choosing candidate noun phrases irrespective of document
-    print("Raw Noun Phrases: Dev Accuracy:",compute_acc(Y_dev,Y_dev_hat))
+    #print("Raw Noun Phrases: Dev Accuracy:",compute_acc(Y_dev,Y_dev_hat))
 
     #Write corresponding predicted catchphrases for development set
-    dev_X_doc = tmp_load('dev_X_doc', True)
-    dev_set_of_NP_X = tmp_load('dev_set_of_NP_X', True)
-    write_output(Y_dev_hat,dev_X_doc,dev_set_of_NP_X,task1_n_train*train_dev_split,ext='Train')
+    X_doc_dev = tmp_load('X_doc_dev', True)
+    write_output(Y_dev_hat,X_doc_dev,task1_n_train*train_dev_split,ext='Train')
 
     #Evaluate the development predictions
+    print("IDX","precision","recall",sep='\t')
     precision, recall = evaluate_task1(start_idx=int(task1_n_train*train_dev_split),n_files=int(task1_n_train*(1-train_dev_split)), folder='Train')
     print("\n\n\n",round(np.mean(precision), 4),round(np.mean(recall), 4))
 
@@ -41,10 +41,10 @@ if __name__ == '__main__':
     #print("Raw Noun Phrases: Test Accuracy:",compute_acc(Y_test,Y_test_hat))
 
     ##Write corresponding predicted catchphrases for development set
-    #test_X_doc = tmp_load('test_X_doc', True)
-    #test_set_of_NP_X = tmp_load('test_set_of_NP_X', True)
-    #write_output(Y_test_hat,test_X_doc,test_set_of_NP_X,task1_n_train,ext='Test')
+    #X_doc_test = tmp_load('X_doc_test', True)
+    #write_output(Y_test_hat,X_doc_test,task1_n_train,ext='Test')
 
     ##Evaluate the development predictions
+    #print("IDX","precision","recall",sep='\t')
     #precision, recall = evaluate_task1(start_idx=task1_n_train,n_files=task1_n_test, folder='Test')
     #print("\n\n\n",round(np.mean(precision), 4),round(np.mean(recall), 4))

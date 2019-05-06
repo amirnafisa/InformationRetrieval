@@ -7,10 +7,13 @@ from numpy.linalg import norm
 from nltk.tokenize import word_tokenize, sent_tokenize
 from nltk import pos_tag
 from gensim.models import Word2Vec
+from gensim.test.utils import common_texts
+from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 from collections import defaultdict
 import pickle
 
 VEC_SIZE = 100
+DOC_VEC_SIZE = 10
 proj_dir = 'FIRE2017-IRLeD-track-data'
 models_dir = 'models'
 
@@ -78,10 +81,10 @@ def get_noun_phrases(doc_tokens):
     return noun_phrases
 
 
-def get_model(file):
+def get_model(model, file):
     file = os.path.join(models_dir,file)
     if os.path.isfile(file):
-        return Word2Vec.load(file)
+        return model.load(file)
     return None
 
 
@@ -92,22 +95,26 @@ def save_model(model, file):
     model.save(os.path.join(models_dir,file))
 
 
-def get_vector_embedding_for_NPs(vocab, phrases, model=True):
-
-    doc_vecs = np.zeros((len(phrases),VEC_SIZE))
-
+def create_word2vec_model(vocab, model):
     if model:
-        model = get_model('cur_model.mdl')
+        model = get_model(Word2Vec, 'cur_model.mdl')
     if not model:
-
         model = Word2Vec(vocab, min_count=1, size=VEC_SIZE, window=5) #CBOW Model from gensim
         save_model(model, 'cur_model.mdl')
+    return model
 
-    for i, phrase in enumerate(phrases):
-        doc_vecs[i] = get_vector_embedding(model, phrase)
+def create_doc2vec_model(documents,model):
 
-    return doc_vecs
+    if model:
+        model = get_model(Doc2Vec,'cur_doc_model.mdl')
+    if not model:
+        tag_documents = [TaggedDocument(doc, [i]) for i, doc in enumerate(documents)]
+        model = Doc2Vec(tag_documents, vector_size=DOC_VEC_SIZE, window=2, min_count=1, workers=4)
+        save_model(model, 'cur_doc_model.mdl')
+    return model
 
+def get_vector_embedding_for_docs(doc, model):
+    return model.infer_vector(doc)
 
 def compute_centroid(vecs):
     return np.mean(vecs,axis=0)
@@ -123,7 +130,7 @@ def cosine_sim(x, y):
         return 0
     return np.dot(x.T,y)/(norm(x) * norm(y))
 
-def get_vector_embedding(model, phrase):
+def get_vector_embedding_for_NP(phrase, model):
 
     vec = np.zeros((VEC_SIZE,))
     for word in phrase.split(' '):
@@ -142,7 +149,7 @@ def tmp_save(item, file):
         pickle.dump(item, fp, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-def tmp_load(file, load):
+def tmp_load(file, load=True):
     if not load:
         return None
     dir = 'tmp_files'
@@ -152,7 +159,7 @@ def tmp_load(file, load):
             return pickle.load(fp)
     return None
 
-def write_output(Y_test_hat,test_X_doc,test_set_of_NP_X,start_idx,ext='Train'):
+def write_output(Y_test_hat,test_X_doc,start_idx,ext='Train'):
     print("Printing Task1 Outputs ...")
 
     dir = 'output/'
@@ -164,14 +171,16 @@ def write_output(Y_test_hat,test_X_doc,test_set_of_NP_X,start_idx,ext='Train'):
         os.mkdir(dir)
 
     print(Y_test_hat.shape)
+    j = 0
     for i in range(len(test_X_doc)):
         f = open(dir+'case_'+str(int(i+start_idx))+'_catchwords.txt','w')
 
         for noun_phrase in test_X_doc[i]:
-            j = test_set_of_NP_X.index(noun_phrase)
-
             if Y_test_hat[j] == 1:
                 f.write(str(noun_phrase)+', ')
+
+            j += 1
+
         f.close()
 
 def evaluate_task1(start_idx, n_files, folder):
@@ -202,12 +211,7 @@ def evaluate_task1(start_idx, n_files, folder):
 def compute_prec_recall(golden_truth, prediction):
 
     common_set = set(golden_truth).intersection(set(prediction))
-    print(common_set)
-
     precision = round(len(common_set)/len(prediction), 4)
-
     recall = round(len(common_set)/len(golden_truth), 4)
-
-
 
     return precision, recall
