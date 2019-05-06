@@ -12,6 +12,8 @@ if __name__ == '__main__':
 
     X_train,Y_train,X_dev,Y_dev,X_test,Y_test = prepare_dataset(task1_n_train,task1_n_test,train_dev_split,preload)
 
+    print(X_train.shape)
+
     print("Training Task1 ...")
     #Start Training (X,Y) Use Development dataset for training
     classifier = Default #Could be Default

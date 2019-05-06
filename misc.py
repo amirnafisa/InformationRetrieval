@@ -12,8 +12,8 @@ from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 from collections import defaultdict
 import pickle
 
-VEC_SIZE = 100
-DOC_VEC_SIZE = 10
+VEC_SIZE = 20
+DOC_VEC_SIZE = 5
 proj_dir = 'FIRE2017-IRLeD-track-data'
 models_dir = 'models'
 
@@ -170,7 +170,6 @@ def write_output(Y_test_hat,test_X_doc,start_idx,ext='Train'):
     if not os.path.exists(dir):
         os.mkdir(dir)
 
-    print(Y_test_hat.shape)
     j = 0
     for i in range(len(test_X_doc)):
         f = open(dir+'case_'+str(int(i+start_idx))+'_catchwords.txt','w')
@@ -178,7 +177,6 @@ def write_output(Y_test_hat,test_X_doc,start_idx,ext='Train'):
         for noun_phrase in test_X_doc[i]:
             if Y_test_hat[j] == 1:
                 f.write(str(noun_phrase)+', ')
-
             j += 1
 
         f.close()
@@ -195,11 +193,13 @@ def evaluate_task1(start_idx, n_files, folder):
         with open(file_true) as f:
             lines = f.readline()
             list_true = set(lines.strip().lower().split(','))
+            list_true = list(map(lambda t:t.lstrip(' '), list_true))
 
 
         with open(file_hat) as f:
             lines = f.readline()
-            list_hat = set(lines.strip().lower().split(','))
+            list_hat = set(lines.strip(' ').lower().split(','))
+            list_hat = list(map(lambda t:t.lstrip(' '), list_hat))
 
         precision[j], recall[j] = compute_prec_recall(list_true, list_hat)
 
@@ -211,6 +211,14 @@ def evaluate_task1(start_idx, n_files, folder):
 def compute_prec_recall(golden_truth, prediction):
 
     common_set = set(golden_truth).intersection(set(prediction))
+
+    ##print for debugging 0 recall and 0 precision values
+    ##It prints the list of corresponding catchphrases
+    #if len(common_set) == 0:
+    #    print("\nGolden Truth: ",golden_truth)
+    #    print("\nPrediction:   ",prediction)
+    #print()
+
     precision = round(len(common_set)/len(prediction), 4)
     recall = round(len(common_set)/len(golden_truth), 4)
 
