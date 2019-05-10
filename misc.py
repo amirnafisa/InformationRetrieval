@@ -12,6 +12,7 @@ from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 from collections import defaultdict
 import pickle
 
+
 VEC_SIZE = 20
 DOC_VEC_SIZE = 5
 proj_dir = 'FIRE2017-IRLeD-track-data'
@@ -223,3 +224,45 @@ def compute_prec_recall(golden_truth, prediction):
     recall = round(len(common_set)/len(golden_truth), 4)
 
     return precision, recall
+
+def crf_debug_print_file(y_pred):
+
+    sent = tmp_load('crf_X_test_sent')
+    with open(proj_dir+'/tmp_files/crf_pred_debug.tsv','w') as f:
+        for i in range(len(sent)):
+            for j in range(len(sent[i])):
+                if y_pred[i][j] == 'B-CP' and j == 0:
+                    f.write(sent[i][j][0])
+                if y_pred[i][j] == 'B-CP' and j > 0:
+                    f.write(', '+sent[i][j][0])
+                if y_pred[i][j] == 'I-CP':
+                    f.write(' '+sent[i][j][0])
+            f.write('\n')
+
+def prepare_crf_dataset():
+    #Extract features and create dataset
+    X_train = tmp_load('crf_X_train')
+    y_train = tmp_load('crf_y_train')
+    if not X_train:
+        print('Extracting features from training dataset ...')
+        sent = extract_features(1,'Train')
+        tmp_save(sent,'crf_X_train_sent')
+        X_train = [sent2features(s) for s in sent]
+        y_train = [sent2labels(s) for s in sent]
+
+        tmp_save(X_train, 'crf_X_train')
+        tmp_save(y_train, 'crf_y_train')
+
+    X_test = tmp_load('crf_X_test')
+    y_test = tmp_load('crf_y_test')
+    if not X_test:
+        print('Extracting features from test dataset ...')
+        sent = extract_features(1,'Test')
+        tmp_save(sent,'crf_X_test_sent')
+        X_test = [sent2features(s) for s in sent]
+        y_test = [sent2labels(s) for s in sent]
+
+        tmp_save(X_test, 'crf_X_test')
+        tmp_save(y_test, 'crf_y_test')
+
+    return X_train, y_train, X_test, y_test
