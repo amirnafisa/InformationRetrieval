@@ -4,7 +4,7 @@ from sklearn.decomposition import PCA
 from precrf import *
 from sklearn_crfsuite import CRF
 from sklearn.model_selection import cross_val_predict
-
+from sklearn_crfsuite.metrics import flat_classification_report
 from eli5.sklearn_crfsuite import explain_weights_sklearn_crfsuite
 
 epsilon = 0.2
