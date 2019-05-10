@@ -1,12 +1,11 @@
 from misc import *
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.decomposition import PCA
-from precrf import *
 from sklearn_crfsuite import CRF
 from sklearn.model_selection import cross_val_predict
 from sklearn_crfsuite.metrics import flat_classification_report
 from eli5.sklearn_crfsuite import explain_weights_sklearn_crfsuite
-
+import sys
 epsilon = 0.2
 
 def Default(doc_vecs_tr, doc_vecs_tt, Y_tr):
@@ -29,16 +28,17 @@ def KNeighbours(doc_vecs_tr, doc_vecs_tt, Y_tr):
     return Y_hat
 
 def CRF_Model(X_train, y_train, X_test):
-    crf = tmp_load('crf.mdl')
+    crf = tmp_load('crf.mdl',load=False)
     if not crf:
         print('Creating CRF model ...')
         crf = CRF(algorithm='lbfgs',c1=0.1,c2=0.1,max_iterations=100,all_possible_transitions=False)
 
         print('Cross validating CRF ...')
         ##Cross validation
-        pred = cross_val_predict(estimator=crf, X=X_train, y=y_train, cv=5)
+        pred = cross_val_predict(estimator=crf, X=X_train, y=y_train, cv=3)
         report = flat_classification_report(y_pred=pred, y_true=y_train)
         print(report)
+
         tmp_save(crf, 'crf.mdl')
 
     print('Training CRF ...')

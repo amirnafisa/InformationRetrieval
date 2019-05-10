@@ -5,7 +5,7 @@ from misc import prepare_crf_dataset
 from models import CRF_Model
 
 def crf_model():
-    X_train, y_train, X_test, y_test = prepare_crf_dataset()
+    X_train, y_train, X_test, y_test = prepare_crf_dataset(load=False)
 
 
     #Train and Predict CRF
