@@ -1,0 +1,36 @@
+Nafisa:InformationRetrieval$ ./experiment.py LSTMBased
+Using TensorFlow backend.
+Loading sentences training dataset ...
+Extracting features from training dataset ...
+Extracting features from testing dataset ...
+
+Load Data Time:  138.04491901397705
+WARNING:tensorflow:From /usr/local/lib/python3.7/site-packages/tensorflow/python/framework/op_def_library.py:263: colocate_with (from tensorflow.python.framework.ops) is deprecated and will be removed in a future version.
+Instructions for updating:
+Colocations handled automatically by placer.
+WARNING:tensorflow:From /usr/local/lib/python3.7/site-packages/keras/backend/tensorflow_backend.py:3445: calling dropout (from tensorflow.python.ops.nn_ops) with keep_prob is deprecated and will be removed in a future version.
+Instructions for updating:
+Please use `rate` instead of `keep_prob`. Rate should be set to `rate = 1 - keep_prob`.
+WARNING:tensorflow:From /usr/local/lib/python3.7/site-packages/tensorflow/python/ops/math_ops.py:3066: to_int32 (from tensorflow.python.ops.math_ops) is deprecated and will be removed in a future version.
+Instructions for updating:
+Use tf.cast instead.
+Train on 17380 samples, validate on 1932 samples
+Epoch 1/1
+2019-05-11 13:48:14.313070: I tensorflow/core/platform/cpu_feature_guard.cc:141] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX2 FMA
+17380/17380 [==============================] - 62s 4ms/step - loss: 0.0465 - acc: 0.9883 - val_loss: 0.0310 - val_acc: 0.9917
+
+Fit Time:  64.35249304771423
+
+Predict Time:  439.48387694358826
+
+y_true shape:  (56474, 50)
+
+y_pred shape:  (56474, 50)
+              precision    recall  f1-score   support
+
+           0       0.99      1.00      0.99   2795280
+           1       0.45      0.10      0.17     28420
+
+   micro avg       0.99      0.99      0.99   2823700
+   macro avg       0.72      0.55      0.58   2823700
+weighted avg       0.99      0.99      0.99   2823700

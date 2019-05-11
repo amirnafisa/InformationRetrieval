@@ -11,7 +11,9 @@ from gensim.test.utils import common_texts
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 from collections import defaultdict
 import pickle
-
+import time
+from keras.preprocessing.sequence import pad_sequences
+from keras.utils import to_categorical
 
 
 VEC_SIZE = 20
@@ -145,7 +147,7 @@ def crf_debug_print_file(y_pred):
                         f.write(', ')
             f.write('\n')
 
-def prepare_crf_dataset(load=True):
+def prepare_crf_dataset(load, n_train, n_test):
     #Extract features and create dataset
     X_train, X_test = None, None
     if load:
@@ -153,7 +155,7 @@ def prepare_crf_dataset(load=True):
         y_train = tmp_load('crf_y_train')
     if not X_train or not load:
         print('Extracting features from training dataset ...')
-        sent, _ = load_tag_files(1,'Train')
+        sent, _ = load_tag_files(1,'Train', n_train)
         tmp_save(sent,'crf_X_train_sent')
         X_train = [sent2features(s) for s in sent]
         y_train = [sent2labels(s) for s in sent]
@@ -166,7 +168,7 @@ def prepare_crf_dataset(load=True):
         y_test = tmp_load('crf_y_test')
     if not X_test or not load:
         print('Extracting features from test dataset ...')
-        sent, _ = load_tag_files(1,'Test')
+        sent, _ = load_tag_files(1,'Test', n_test)
         tmp_save(sent,'crf_X_test_sent')
         X_test = [sent2features(s) for s in sent]
         y_test = [sent2labels(s) for s in sent]
@@ -176,15 +178,13 @@ def prepare_crf_dataset(load=True):
 
     return X_train, y_train, X_test, y_test
 
-def load_tag_files(task, mode):
+def load_tag_files(task, mode, n_files):
     sent = []
     CP_set = set()
     if mode == 'Train':
         start_idx = 0
-        n_files = 100
     else:
         start_idx = 100
-        n_files = 300
     for i in range(start_idx,start_idx+n_files):
 
         train_file = get_file_name(1, mode, 'docs', i)
@@ -203,12 +203,13 @@ def load_tag_files(task, mode):
                 sentences = sent_tokenize(line)
                 for j, sentence in enumerate(sentences):
                     sent.append([])
-                    words = word_tokenize(sentence)
+                    tokens = word_tokenize(sentence)
+                    words = [w.lower() for w in tokens]
                     POS_tags = pos_tag(words)
                     next_label = 0
 
                     for k, [word, tag] in enumerate(zip(words, POS_tags)):
-                        filter_CP = list(filter(lambda t: word in t, catch_phrases))
+                        filter_CP = list(filter(lambda t: word.lower() in t, catch_phrases))
                         filter_CP = list(filter(lambda t: t == words[k-t.index(word):k-t.index(word)+len(t)], filter_CP))
                         label = 'CP' if filter_CP else 'O'
 
@@ -266,10 +267,8 @@ def sent2tokens(sent):
 
 def sent2doc_tokens(sents):
     doc_tokens = defaultdict()
-    vocab = set()
     for sent in sents:
         for i, [token, postag, label, doc_idx] in enumerate(sent):
-            vocab.update(token)
             if doc_idx in doc_tokens:
                 if i == 0:
                     doc_tokens[doc_idx].append([token])
@@ -277,27 +276,169 @@ def sent2doc_tokens(sents):
                     doc_tokens[doc_idx][-1].append(token)
             else:
                 doc_tokens[doc_idx] = [[token]]
-    return doc_tokens, vocab
+    return doc_tokens
 
-def get_predicted_NPs(y, retrieved_test_NPs):
+def y2NP(y, retrieved_test_NPs):
     pred_NPs = set()
     j = 0
-    for i in range(len(retrieved_test_NPs)):
-        for phrase in retrieved_test_NPs[i]:
+    for i, NPs in retrieved_test_NPs.items():
+        for NP in NPs:
             if y[j] == 1:
-                pred_NPs.update(phrase)
+                pred_NPs.update([NP])
             j+=1
     pred_NPs = list(map(lambda t: t.split(' '), list(pred_NPs)))
     return list(pred_NPs)
 
-def tag_pred_labels(tagged_test_sents, pred_NPs):
+def tag_pred_labels(doc_tokens, pred_NPs):
+
     pred_output = []
-    for j, sent in enumerate(tagged_test_sents):
-        pred_output.append([])
-        tokens = sent2tokens(sent)
-        for k, token in enumerate(tokens):
-            filter_CP = list(filter(lambda t: token in t, pred_NPs))
-            filter_CP = list(filter(lambda t: t == tokens[k-t.index(token):k-t.index(token)+len(t)], filter_CP))
-            label = 'CP' if filter_CP else 'O'
-            pred_output[j].append(label)
+    start = time.time()
+    for i, sents in doc_tokens.items():
+        if (i%10==0):
+            print(i, time.time()-start)
+            start = time.time()
+        for j, tokens in enumerate(sents):
+            for k, token in enumerate(tokens):
+                pred_output.append('O')
+                filter_CP = list(filter(lambda t: token in t, pred_NPs))
+                filter_CP = list(filter(lambda t: t == tokens[k-t.index(token):k-t.index(token)+len(t)], filter_CP))
+                pred_output[-1] = 'CP' if filter_CP else 'O'
+
     return pred_output
+
+def get_NP(doc_tokens):
+    NPs = defaultdict()
+    for doc_idx, doc in doc_tokens.items():
+        for sent in doc:
+            NPs_ret = list(set(get_noun_phrases(sent).keys()))
+            if NPs_ret:
+                if doc_idx in NPs:
+                    NPs[doc_idx].extend( NPs_ret )
+                else:
+                    NPs[doc_idx] = list(set(get_noun_phrases(sent).keys()))
+    return NPs
+
+def get_doc2vec_NP2vec(doc_tokens, retrieved_NPs, true_CPs, doc2vec_model, word2vec_model):
+    set_of_NP_X, total_vec = [], []
+    for i in range(len(retrieved_NPs)):
+        doc_vec = get_vector_embedding_for_docs(doc_tokens[i], doc2vec_model)
+
+        for phrase in retrieved_NPs[i]:
+            set_of_NP_X.append(phrase)
+            phrase_vec = get_vector_embedding_for_NP(phrase,word2vec_model)
+            total_vec.append(np.concatenate((phrase_vec, doc_vec)))
+
+    X = np.array(total_vec)
+
+    y = np.array(list(map(lambda t: 1 if t in true_CPs else 0, set_of_NP_X)))
+
+    return X, y
+
+
+def prepare_VectorBased_dataset(load, n_train, n_test):
+    #Extract features and create dataset
+    X_train, X_test = None, None
+    if load:
+        X_train = tmp_load('VB_X_train')
+        y_train = tmp_load('VB_y_train')
+        doc2vec_model = get_model(Doc2Vec,'cur_doc_model.mdl')
+        word2vec_model = get_model(Word2Vec, 'cur_model.mdl')
+    if isinstance(X_train, type(None)) or not load:
+        print('Extracting features from training dataset ...')
+        tagged_train_sent, true_CPs = load_tag_files(1,'Train', n_train)
+
+        doc_tokens = sent2doc_tokens(tagged_train_sent)
+
+        vocab = list(set([w for i, sents in doc_tokens.items() for s in sents for w in s]))
+
+        tagged_train_output = [l for s in tagged_train_sent for l in sent2labels(s)]
+
+        doc2vec_model  = create_doc2vec_model(doc_tokens)
+        word2vec_model = create_word2vec_model(vocab)
+
+        print("Extracting noun phrases ...")
+        retrieved_train_NPs = get_NP(doc_tokens)
+
+        X_train, y_train = get_doc2vec_NP2vec(doc_tokens, retrieved_train_NPs, true_CPs, doc2vec_model, word2vec_model)
+
+        tmp_save(X_train, 'VB_X_train')
+        tmp_save(y_train, 'VB_y_train')
+
+    if load:
+        X_test = tmp_load('VB_X_test')
+        y_test = tmp_load('VB_y_test')
+        doc_tokens = tmp_load('VB_test_doc_tokens')
+        tagged_test_output = tmp_load('VB_tagged_test_output')
+        retrieved_test_NPs = tmp_load('VB_retrieved_test_NPs')
+
+    if isinstance(X_test, type(None)) or not load:
+        print('\nExtracting features from test dataset ...')
+        tagged_test_sent, true_CPs = load_tag_files(1,'Test', n_test)
+
+        doc_tokens = sent2doc_tokens(tagged_test_sent)
+
+        tagged_test_output = [l for s in tagged_test_sent for l in sent2labels(s)]
+
+        print("Extracting noun phrases ...")
+        retrieved_test_NPs = get_NP(doc_tokens)
+
+        X_test, y_test = get_doc2vec_NP2vec(doc_tokens, retrieved_test_NPs, true_CPs, doc2vec_model, word2vec_model)
+
+        tmp_save(X_test, 'VB_X_test')
+        tmp_save(y_test, 'VB_y_test')
+        tmp_save(doc_tokens, 'VB_test_doc_tokens')
+        tmp_save(tagged_test_output, 'VB_tagged_test_output')
+        tmp_save(retrieved_test_NPs, 'VB_retrieved_test_NPs')
+
+    return X_train, y_train, X_test, y_test, doc_tokens, tagged_test_output, retrieved_test_NPs
+
+
+def prepare_lstm_dataset(load, max_len, n_train, n_test):
+    #Extract features and create dataset
+    X_train, X_test = None, None
+    if load:
+        X_train = tmp_load('lstm_X_train')
+        y_train = tmp_load('lstm_y_train')
+        X_test = tmp_load('lstm_X_test')
+        y_test = tmp_load('lstm_y_test')
+        vocab = tmp_load('lstm_vocab')
+        labels = tmp_load('lstm_labels')
+
+    if type(X_train) == type(None) or not load:
+        print('Loading sentences training dataset ...')
+        sent, _ = load_tag_files(1,'Train', n_train)
+
+        vocab = list(set([w[0] for s in sent for w in s]))
+        vocab.append('PADGARBAGE')
+        n_vocab = len(vocab)
+        labels = list(set([labels for s in sent for labels in sent2labels(s) ]))
+        n_labels = len(labels)
+
+        word2idx = {w: i for i, w in enumerate(vocab)}
+        label2idx = {t: i for i, t in enumerate(labels)}
+
+
+        print('Extracting features from training dataset ...')
+        X_train = [[word2idx[w[0]] for w in s] for s in sent]
+        X_train = pad_sequences(maxlen=max_len, sequences=X_train, padding="post", value=n_vocab - 1)
+        y_train = [[label2idx[w[2]] for w in s] for s in sent]
+        y_train = pad_sequences(maxlen=max_len, sequences=y_train, padding="post", value=label2idx["O"])
+        y_train = [to_categorical(i, num_classes=n_labels) for i in y_train]
+
+        print('Extracting features from testing dataset ...')
+        sent, _ = load_tag_files(1,'Test', n_test)
+
+        X_test = [[word2idx[w[0]] if w[0] in word2idx else word2idx['PADGARBAGE'] for w in s] for s in sent]
+        X_test = pad_sequences(maxlen=max_len, sequences=X_test, padding="post", value=n_vocab - 1)
+        y_test = [[label2idx[w[2]] for w in s] for s in sent]
+        y_test = pad_sequences(maxlen=max_len, sequences=y_test, padding="post", value=label2idx["O"])
+        y_test = [to_categorical(i, num_classes=n_labels) for i in y_test]
+
+        tmp_save(X_train, 'lstm_X_train')
+        tmp_save(y_train, 'lstm_y_train')
+        tmp_save(vocab, 'lstm_vocab')
+        tmp_save(labels, 'lstm_labels')
+        tmp_save(X_test, 'lstm_X_test')
+        tmp_save(y_test, 'lstm_y_test')
+
+    return X_train, y_train, X_test, y_test, vocab, labels
