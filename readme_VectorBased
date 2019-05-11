@@ -37,3 +37,11 @@ sent2labels Time:  0.3033599853515625
 retrieved NPs Time:  93.81007313728333
 
 doc2vec_NP2vec Time:  6.231583833694458
+
+        precision    recall  f1-score   support
+
+CP       0.12      0.90      0.21      1306
+
+micro avg       0.12      0.90      0.21      1306
+macro avg       0.12      0.90      0.21      1306
+weighted avg       0.12      0.90      0.21      1306

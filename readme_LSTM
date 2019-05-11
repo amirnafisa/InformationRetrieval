@@ -26,11 +26,11 @@ Predict Time:  439.48387694358826
 y_true shape:  (56474, 50)
 
 y_pred shape:  (56474, 50)
-              precision    recall  f1-score   support
 
-           0       0.99      1.00      0.99   2795280
-           1       0.45      0.10      0.17     28420
+        precision    recall  f1-score   support
 
-   micro avg       0.99      0.99      0.99   2823700
-   macro avg       0.72      0.55      0.58   2823700
-weighted avg       0.99      0.99      0.99   2823700
+CP       0.43      0.03      0.06      1204
+
+micro avg       0.43      0.03      0.06      1204
+macro avg       0.43      0.03      0.06      1204
+weighted avg       0.43      0.03      0.06      1204
