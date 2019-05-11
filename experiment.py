@@ -2,13 +2,14 @@
 import sys
 from Default_model import *
 from CRF_model import *
+from LSTM_model import *
 
 def parse_args():
     if len(sys.argv) < 2:
-        print("Command is ./experiment <model>\nModel 1: VectorBased\tModel2: CRFBased")
+        print("Command is ./experiment <model>\nModel 1: VectorBased\tModel2: CRFBased\tModel3: LSTMBased")
         return None
     model = sys.argv[1]
-    if model == 'VectorBased' or model == 'CRFBased':
+    if model == 'VectorBased' or model == 'CRFBased' or 'LSTMBased':
         return model
 
     print("Available models are: \nModel 1: VectorBased\tModel2: CRFBased")
@@ -47,6 +48,15 @@ if __name__ == '__main__':
 
         #cv_score = IRModel.cross_validate(X_train, y_train, scoring='recall_macro')
         #print("Cross Validation Score for Vector Based IR:\n",cv_score,"\n\n")
+
+        IRModel.fit(X_train, y_train)
+        y_pred = IRModel.predict(X_test)
+        IRModel.evaluate(y_true=y_test, y_pred=y_pred)
+
+    if IRClass == 'LSTMBased':
+        IRModel = LSTMBased(load=False)
+        X_train, y_train, X_test, y_test = IRModel.load_data()
+        #IRModel.cross_validate(X_train, y_train)
 
         IRModel.fit(X_train, y_train)
         y_pred = IRModel.predict(X_test)

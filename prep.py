@@ -1,4 +1,7 @@
 from misc import *
+from keras.preprocessing.sequence import pad_sequences
+from keras.utils import to_categorical
+from collections import defaultdict
 
 def get_NP(doc_tokens):
     NPs = defaultdict()
@@ -84,3 +87,59 @@ def prepare_dataset(load):
         tmp_save(retrieved_test_NPs, 'VB_retrieved_test_NPs')
 
     return X_train, y_train, X_test, y_test, tagged_test_sent, tagged_test_output, retrieved_test_NPs
+
+
+def prepare_lstm_dataset(load=True, max_len=50):
+    #Extract features and create dataset
+    X_train, X_test = None, None
+    if load:
+        X_train = tmp_load('lstm_X_train')
+        y_train = tmp_load('lstm_y_train')
+    if not X_train or not load:
+
+
+        sent = tmp_load('sent_train')
+        if type(sent) == type(None):
+            print('Loading sentences training dataset ...')
+            sent, _ = load_tag_files(1,'Train')
+            tmp_save(sent,'sent_train')
+
+        vocab = list(set([w[0] for s in sent for w in s]))
+        vocab.append('PADGARBAGE')
+        n_vocab = len(vocab)
+        labels = list(set([labels for s in sent for labels in sent2labels(s) ]))
+        n_labels = len(labels)
+
+        word2idx = {w: i for i, w in enumerate(vocab)}
+        label2idx = {t: i for i, t in enumerate(labels)}
+
+        X_train = tmp_load('lstm_X_train')
+        y_train = tmp_load('lstm_y_train')
+        if type(X_train) == type(None):
+            print('Extracting features from training dataset ...')
+            X_train = [[word2idx[w[0]] for w in s] for s in sent]
+            X_train = pad_sequences(maxlen=max_len, sequences=X_train, padding="post", value=n_vocab - 1)
+            y_train = [[label2idx[w[2]] for w in s] for s in sent]
+            y_train = pad_sequences(maxlen=max_len, sequences=y_train, padding="post", value=label2idx["O"])
+
+            y_train = [to_categorical(i, num_classes=n_labels) for i in y_train]
+
+            tmp_save(X_train, 'lstm_X_train')
+            tmp_save(y_train, 'lstm_y_train')
+
+
+        X_test = tmp_load('lstm_X_test')
+        y_test = tmp_load('lstm_y_test')
+        if type(X_test) == type(None):
+            print('Extracting features from testing dataset ...')
+            sent, _ = load_tag_files(1,'Test')
+
+            X_test = [[word2idx[w[0]] if w[0] in word2idx else word2idx['PADGARBAGE'] for w in s] for s in sent]
+            X_test = pad_sequences(maxlen=max_len, sequences=X_test, padding="post", value=n_vocab - 1)
+            y_test = [[label2idx[w[2]] for w in s] for s in sent]
+            y_test = pad_sequences(maxlen=max_len, sequences=y_test, padding="post", value=label2idx["O"])
+
+            y_test = [to_categorical(i, num_classes=n_labels) for i in y_test]
+            tmp_save(X_test, 'lstm_X_test')
+            tmp_save(y_test, 'lstm_y_test')
+    return X_train, y_train, X_test, y_test, vocab, labels

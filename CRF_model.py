@@ -1,11 +1,9 @@
-#!/usr/bin/env python3
-
 from sklearn_crfsuite.metrics import flat_classification_report
 from misc import prepare_crf_dataset
 from sklearn_crfsuite import CRF
 
 class CRFBased:
-    '''Vector based information retrieval.
+    '''CRF based information retrieval.
     The model is similar to the Default model
     used in homework 2 and 3'''
 
