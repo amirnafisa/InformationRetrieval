@@ -19,6 +19,7 @@ DOC_VEC_SIZE = 5
 proj_dir = 'FIRE2017-IRLeD-track-data'
 models_dir = 'models'
 
+
 def get_file_name(task=1, train_mode='Train', doc_type='docs', idx=0):
     if doc_type == 'docs':
         filename = 'Task_' + str(task) + '/' + train_mode + '_docs/case_' + str(idx) + '_statement.txt'
@@ -31,34 +32,6 @@ def get_file_name(task=1, train_mode='Train', doc_type='docs', idx=0):
     elif doc_type == 'irled-qrel':
         filename = 'Task_' + str(task) + '/' + doc_type + '.txt'
     return os.path.join(proj_dir,filename)
-
-
-def read_docs(start_idx, n_files, task=1, train_mode='Train', doc_type='docs'):
-    '''
-    Reads the corpus into a list of Documents
-    '''
-    docs = []
-    vocab = []
-
-
-    for i in range(n_files):
-
-        file = get_file_name(task, train_mode, doc_type, start_idx+i)
-
-        with open(file,encoding = "ISO-8859-1") as f:
-            docs.append([])
-            for line in f:
-                sentences = sent_tokenize(line) if doc_type == 'docs' else line.split(',')
-
-                for sentence in sentences:
-                    word_tokens = word_tokenize(sentence) if doc_type == 'docs' else [sentence]
-                    if word_tokens:
-                        word_tokens = list(map(lambda x:x.lower().strip(),word_tokens))
-                        docs[i].extend(word_tokens)
-                        vocab.extend([word_tokens])
-
-    return docs, vocab
-
 
 def get_noun_phrases(doc_tokens):
     '''
@@ -97,26 +70,22 @@ def save_model(model, file):
     model.save(os.path.join(models_dir,file))
 
 
-def create_word2vec_model(vocab, model):
-    if model:
-        model = get_model(Word2Vec, 'cur_model.mdl')
-    if not model:
-        model = Word2Vec(vocab, min_count=1, size=VEC_SIZE, window=5) #CBOW Model from gensim
-        save_model(model, 'cur_model.mdl')
+def create_word2vec_model(vocab):
+
+    model = Word2Vec(vocab, min_count=1, size=VEC_SIZE, window=5) #CBOW Model from gensim
+    save_model(model, 'cur_model.mdl')
     return model
 
-def create_doc2vec_model(documents,model):
+def create_doc2vec_model(documents):
 
-    if model:
-        model = get_model(Doc2Vec,'cur_doc_model.mdl')
-    if not model:
-        tag_documents = [TaggedDocument(doc, [i]) for i, doc in enumerate(documents)]
-        model = Doc2Vec(tag_documents, vector_size=DOC_VEC_SIZE, window=2, min_count=1, workers=4)
-        save_model(model, 'cur_doc_model.mdl')
+    tag_documents = [TaggedDocument([word for flatten_doc in doc for word in flatten_doc], [i]) for i, doc in documents.items()]
+    model = Doc2Vec(tag_documents, vector_size=DOC_VEC_SIZE, window=2, min_count=1, workers=4)
+    save_model(model, 'cur_doc_model.mdl')
     return model
 
 def get_vector_embedding_for_docs(doc, model):
-    return model.infer_vector(doc)
+    flatten_doc = [word for flatten_doc in doc for word in flatten_doc]
+    return model.infer_vector(flatten_doc)
 
 def compute_centroid(vecs):
     return np.mean(vecs,axis=0)
@@ -135,7 +104,7 @@ def cosine_sim(x, y):
 def get_vector_embedding_for_NP(phrase, model):
 
     vec = np.zeros((VEC_SIZE,))
-    for word in phrase.split(' '):
+    for word in phrase:
         if word in model.wv:
             vec += model.wv[word]
     vec /= len(phrase)
@@ -161,83 +130,19 @@ def tmp_load(file, load=True):
             return pickle.load(fp)
     return None
 
-def write_output(Y_test_hat,test_X_doc,start_idx,ext='Train'):
-    print("Printing Task1 Outputs ...")
-
-    dir = 'output/'
-    if not os.path.exists(dir):
-        os.mkdir(dir)
-
-    dir = 'output/'+ext+'/'
-    if not os.path.exists(dir):
-        os.mkdir(dir)
-
-    j = 0
-    for i in range(len(test_X_doc)):
-        f = open(dir+'case_'+str(int(i+start_idx))+'_catchwords.txt','w')
-
-        for noun_phrase in test_X_doc[i]:
-            if Y_test_hat[j] == 1:
-                f.write(str(noun_phrase)+', ')
-            j += 1
-
-        f.close()
-
-def evaluate_task1(start_idx, n_files, folder):
-    precision = np.zeros((n_files))
-    recall = np.zeros_like(precision)
-
-    for j in range(n_files):
-        i = j+start_idx
-        file_true = get_file_name(1, folder, 'catches', i)
-        file_hat = 'output/'+folder+'/case_'+str(i)+'_catchwords.txt'
-
-        with open(file_true) as f:
-            lines = f.readline()
-            list_true = set(lines.strip().lower().split(','))
-            list_true = list(map(lambda t:t.lstrip(' '), list_true))
-
-
-        with open(file_hat) as f:
-            lines = f.readline()
-            list_hat = set(lines.strip(' ').lower().split(','))
-            list_hat = list(map(lambda t:t.lstrip(' '), list_hat))
-
-        precision[j], recall[j] = compute_prec_recall(list_true, list_hat)
-
-        print(j, precision[j], recall[j], sep='\t')
-
-    return precision, recall
-
-
-def compute_prec_recall(golden_truth, prediction):
-
-    common_set = set(golden_truth).intersection(set(prediction))
-
-    ##print for debugging 0 recall and 0 precision values
-    ##It prints the list of corresponding catchphrases
-    #if len(common_set) == 0:
-    #    print("\nGolden Truth: ",golden_truth)
-    #    print("\nPrediction:   ",prediction)
-    #print()
-
-    precision = round(len(common_set)/len(prediction), 4)
-    recall = round(len(common_set)/len(golden_truth), 4)
-
-    return precision, recall
-
 def crf_debug_print_file(y_pred):
 
     sent = tmp_load('crf_X_test_sent')
     with open(proj_dir+'/tmp_files/crf_pred_debug.tsv','w') as f:
         for i in range(len(sent)):
             for j in range(len(sent[i])):
-                if y_pred[i][j] == 'B-CP' and j == 0:
+                if y_pred[i][j] == 'CP' and j == 0:
                     f.write(sent[i][j][0])
-                if y_pred[i][j] == 'B-CP' and j > 0:
-                    f.write(', '+sent[i][j][0])
-                if y_pred[i][j] == 'I-CP':
+                elif y_pred[i][j] == 'CP' and j > 0:
                     f.write(' '+sent[i][j][0])
+                elif j > 0:
+                    if y_pred[i][j-1] == 'CP':
+                        f.write(', ')
             f.write('\n')
 
 def prepare_crf_dataset(load=True):
@@ -248,7 +153,7 @@ def prepare_crf_dataset(load=True):
         y_train = tmp_load('crf_y_train')
     if not X_train or not load:
         print('Extracting features from training dataset ...')
-        sent = extract_crf_features(1,'Train')
+        sent, _ = load_tag_files(1,'Train')
         tmp_save(sent,'crf_X_train_sent')
         X_train = [sent2features(s) for s in sent]
         y_train = [sent2labels(s) for s in sent]
@@ -261,7 +166,7 @@ def prepare_crf_dataset(load=True):
         y_test = tmp_load('crf_y_test')
     if not X_test or not load:
         print('Extracting features from test dataset ...')
-        sent = extract_crf_features(1,'Test')
+        sent, _ = load_tag_files(1,'Test')
         tmp_save(sent,'crf_X_test_sent')
         X_test = [sent2features(s) for s in sent]
         y_test = [sent2labels(s) for s in sent]
@@ -271,8 +176,9 @@ def prepare_crf_dataset(load=True):
 
     return X_train, y_train, X_test, y_test
 
-def extract_crf_features(task, mode):
+def load_tag_files(task, mode):
     sent = []
+    CP_set = set()
     if mode == 'Train':
         start_idx = 0
         n_files = 100
@@ -288,6 +194,8 @@ def extract_crf_features(task, mode):
         with open(catch_file,encoding = "ISO-8859-1") as f:
             for line in f:
                 for phrase in line.strip().split(','):
+
+                    CP_set.update([phrase.strip().lower()])
                     catch_phrases.append(word_tokenize(phrase.strip().lower()))
 
         with open(train_file,encoding = "ISO-8859-1") as f:
@@ -298,20 +206,14 @@ def extract_crf_features(task, mode):
                     words = word_tokenize(sentence)
                     POS_tags = pos_tag(words)
                     next_label = 0
+
                     for k, [word, tag] in enumerate(zip(words, POS_tags)):
-                        [label, next_label, labeled_already] = ['I-CP', next_label-1, True] if next_label > 0 else ['O', 0, False]
+                        filter_CP = list(filter(lambda t: word in t, catch_phrases))
+                        filter_CP = list(filter(lambda t: t == words[k-t.index(word):k-t.index(word)+len(t)], filter_CP))
+                        label = 'CP' if filter_CP else 'O'
 
-                        if next_label == 0 and not labeled_already:
-                            filter_CP = list(filter(lambda t: word in t, catch_phrases))
-                            max_len = 0
-                            for CP in filter_CP:
-
-                                l = len(CP)
-                                idx = CP.index(word)
-                                [label, max_len, next_label] = ['B-CP', l, l-1] if idx == 0 and l > max_len and CP == words[k-idx:k-idx+l] else [label, max_len, next_label]
-
-                        sent[-1].append((*tag, label))
-    return sent
+                        sent[-1].append((*tag, label, i-start_idx))
+    return sent, list(CP_set)
 
 def word2features(sent, i):
     word = sent[i][0]
@@ -357,7 +259,45 @@ def sent2features(sent):
     return [word2features(sent, i) for i in range(len(sent))]
 
 def sent2labels(sent):
-    return [label for token, postag, label in sent]
+    return [label for token, postag, label, doc_idx in sent]
 
 def sent2tokens(sent):
-    return [token for token, postag, label in sent]
+    return [token for token, postag, label, doc_idx in sent]
+
+def sent2doc_tokens(sents):
+    doc_tokens = defaultdict()
+    vocab = set()
+    for sent in sents:
+        for i, [token, postag, label, doc_idx] in enumerate(sent):
+            vocab.update(token)
+            if doc_idx in doc_tokens:
+                if i == 0:
+                    doc_tokens[doc_idx].append([token])
+                else:
+                    doc_tokens[doc_idx][-1].append(token)
+            else:
+                doc_tokens[doc_idx] = [[token]]
+    return doc_tokens, vocab
+
+def get_predicted_NPs(y, retrieved_test_NPs):
+    pred_NPs = set()
+    j = 0
+    for i in range(len(retrieved_test_NPs)):
+        for phrase in retrieved_test_NPs[i]:
+            if y[j] == 1:
+                pred_NPs.update(phrase)
+            j+=1
+    pred_NPs = list(map(lambda t: t.split(' '), list(pred_NPs)))
+    return list(pred_NPs)
+
+def tag_pred_labels(tagged_test_sents, pred_NPs):
+    pred_output = []
+    for j, sent in enumerate(tagged_test_sents):
+        pred_output.append([])
+        tokens = sent2tokens(sent)
+        for k, token in enumerate(tokens):
+            filter_CP = list(filter(lambda t: token in t, pred_NPs))
+            filter_CP = list(filter(lambda t: t == tokens[k-t.index(token):k-t.index(token)+len(t)], filter_CP))
+            label = 'CP' if filter_CP else 'O'
+            pred_output[j].append(label)
+    return pred_output

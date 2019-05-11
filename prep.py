@@ -1,87 +1,86 @@
 from misc import *
 
-def load_data_structure(mode, start_idx, n_files, load):
+def get_NP(doc_tokens):
+    NPs = defaultdict()
+    for doc_idx, doc in doc_tokens.items():
+        for sent in doc:
+            NPs_ret = list(set(get_noun_phrases(sent).keys()))
+            if NPs_ret:
+                if doc_idx in NPs:
+                    NPs[doc_idx].append( NPs_ret )
+                else:
+                    NPs[doc_idx] = list(set(get_noun_phrases(sent).keys()))
+    return NPs
 
-    docs_tokens_in = tmp_load(mode+'_docs_tokens_in', load)
-    learn_mode = 'Test' if mode == 'test' else 'Train'
-    if not docs_tokens_in:
-        docs_tokens_in, vocab = read_docs(start_idx, n_files, 1, learn_mode, 'docs')
-        tmp_save(docs_tokens_in, mode+'_docs_tokens_in')
-        if mode == 'train':
-            tmp_save(vocab,'vocab')
+def get_doc2vec_NP2vec(doc_tokens, retrieved_NPs, retrieved_CPs, doc2vec_model, word2vec_model):
+    set_of_NP_X, total_vec = [], []
+    for i in range(len(retrieved_NPs)):
+        doc_vec = get_vector_embedding_for_docs(doc_tokens[i], doc2vec_model)
 
-    docs_tokens_ot = tmp_load(mode+'_docs_tokens_ot', load)
-    if not docs_tokens_ot:
-        docs_tokens_ot, _      = read_docs(start_idx, n_files, 1, learn_mode, 'catches')
-        tmp_save(docs_tokens_ot, mode+'_docs_tokens_ot')
-
-def get_NP(mode, n_files, load):
-    X_doc   = tmp_load('X_doc_' + mode, load)
-
-    if not X_doc:
-        X_doc = defaultdict()
-        docs_tokens_in = tmp_load(mode+'_docs_tokens_in', True)
-        for i in range(n_files):
-            X_doc[i] = list(set(get_noun_phrases(docs_tokens_in[i]).keys()))
-    tmp_save(X_doc, 'X_doc_' + mode)
-
-def get_numpy_vectors(mode, n_files, doc2vec_model, word2vec_model, load):
-
-    X_doc   = tmp_load('X_doc_' + mode)
-    X       = tmp_load('X_'     + mode, load)
-    Y       = tmp_load('Y_'     + mode, load)
-
-    total_vec, set_of_NP_X = [], []
-    docs_tokens_in = tmp_load(mode+'_docs_tokens_in', True)
-    docs_tokens_ot = tmp_load(mode+'_docs_tokens_ot', True)
-
-    for i in range(n_files):
-
-        doc_vec = get_vector_embedding_for_docs(docs_tokens_in[i], doc2vec_model)
-
-        for phrase in X_doc[i]:
+        for phrase in retrieved_NPs[i]:
             set_of_NP_X.append(phrase)
             phrase_vec = get_vector_embedding_for_NP(phrase,word2vec_model)
             total_vec.append(np.concatenate((phrase_vec, doc_vec)))
 
     X = np.array(total_vec)
 
-    set_of_NP_Y = list(set([phrase for doc in docs_tokens_ot for phrase in doc]))
-    Y = np.array(list(map(lambda t: 1 if t in set_of_NP_Y else 0, set_of_NP_X)))
+    y = np.array(list(map(lambda t: 1 if t in retrieved_CPs else 0, set_of_NP_X)))
+
+    return X, y
 
 
-    tmp_save(X,     'X_'     + mode)
-    tmp_save(Y,     'Y_'     + mode)
+def prepare_dataset(load):
+    #Extract features and create dataset
+    X_train, X_test = None, None
+    if load:
+        X_train = tmp_load('VB_X_train')
+        y_train = tmp_load('VB_y_train')
+        doc2vec_model = get_model(Doc2Vec,'cur_doc_model.mdl')
+        word2vec_model = get_model(Word2Vec, 'cur_model.mdl')
+    if isinstance(X_train, type(None)) or not load:
+        print('Extracting features from training dataset ...')
+        tagged_train_sent, retrieved_CPs = load_tag_files(1,'Train')
 
-    return X, Y
+        doc_tokens, vocab = sent2doc_tokens(tagged_train_sent)
 
-def prepare_dataset(task1_n_train = 100,n_test = 300,train_dev_split=0.7,load=True):
-    print("Reading Task1 Docs ...")
+        tagged_train_output = [sent2labels(s) for s in tagged_train_sent]
 
-    n_train = int(task1_n_train*train_dev_split)
-    n_dev = task1_n_train - n_train
+        print("DOC TOKENS",len(doc_tokens))
+        doc2vec_model  = create_doc2vec_model(doc_tokens)
+        word2vec_model = create_word2vec_model(vocab)
 
-    load_data_structure('train', 0, n_train, load)
-    load_data_structure('dev', n_train, n_dev, load)
-    load_data_structure('test', task1_n_train, n_test, load)
+        print("Extracting noun phrases ...")
+        retrieved_train_NPs = get_NP(doc_tokens)
 
-    print("Creating Doc2Vec and Word2Vec Models ...")
+        print('Creating vector embedding training dataset ...')
+        X_train, y_train = get_doc2vec_NP2vec(doc_tokens, retrieved_train_NPs, retrieved_CPs, doc2vec_model, word2vec_model)
 
-    doc2vec_model  = create_doc2vec_model(tmp_load('train_docs_tokens_in'),model=False)
-    word2vec_model = create_word2vec_model(tmp_load('vocab'), model=False)
+        tmp_save(X_train, 'VB_X_train')
+        tmp_save(y_train, 'VB_y_train')
 
-    print("Extracting noun phrases ...")
-    get_NP('train', n_train, load)
-    get_NP('dev',   n_dev, load)
+    if load:
+        X_test = tmp_load('VB_X_test')
+        y_test = tmp_load('VB_y_test')
+        tagged_test_sent = tmp_load('VB_tagged_test_sent')
+        tagged_test_output = tmp_load('VB_tagged_test_output')
+        retrieved_test_NPs = tmp_load('VB_retrieved_test_NPs')
 
-    print("Creating Vector Embeddings ...")
-    load = False
-    X_train, Y_train = get_numpy_vectors('train', n_train, doc2vec_model, word2vec_model, load)
-    X_dev,   Y_dev   = get_numpy_vectors('dev',   n_dev,   doc2vec_model, word2vec_model, load)
+    if isinstance(X_test, type(None)) or not load:
+        print('Extracting features from test dataset ...')
+        tagged_test_sent, retrieved_CPs = load_tag_files(1,'Test')
 
-    return X_train, Y_train, X_dev, Y_dev, None, None
+        doc_tokens, _ = sent2doc_tokens(tagged_test_sent)
 
-    get_NP('test',  n_test, load)
-    X_test , Y_test  = get_numpy_vectors('test',  n_test,  doc2vec_model, word2vec_model, load)
+        tagged_test_output = [sent2labels(s) for s in tagged_test_sent]
 
-    return X_train, Y_train, X_dev, Y_dev, X_test, Y_test
+        retrieved_test_NPs = get_NP(doc_tokens)
+
+        X_test, y_test = get_doc2vec_NP2vec(doc_tokens, retrieved_test_NPs, retrieved_CPs, doc2vec_model, word2vec_model)
+
+        tmp_save(X_test, 'VB_X_test')
+        tmp_save(y_test, 'VB_y_test')
+        tmp_save(tagged_test_sent, 'VB_tagged_test_sent')
+        tmp_save(tagged_test_output, 'VB_tagged_test_output')
+        tmp_save(retrieved_test_NPs, 'VB_retrieved_test_NPs')
+
+    return X_train, y_train, X_test, y_test, tagged_test_sent, tagged_test_output, retrieved_test_NPs
