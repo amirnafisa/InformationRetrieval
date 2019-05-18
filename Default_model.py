@@ -1,4 +1,3 @@
-from models import *
 from misc import *
 from sklearn.model_selection import cross_val_score
 from sklearn.metrics import accuracy_score, classification_report
