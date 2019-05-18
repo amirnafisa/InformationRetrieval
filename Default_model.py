@@ -86,7 +86,7 @@ def prepare_VectorBased_dataset(load, n_train, n_test):
         doc2vec_model = get_model(Doc2Vec,'cur_doc_model.mdl')
         word2vec_model = get_model(Word2Vec, 'cur_model.mdl')
     if isinstance(X_train, type(None)) or not load:
-        print('Extracting features from training dataset ...')
+        print('#Extracting features from training dataset ...')
         tagged_train_sent, true_CPs = load_tag_files(1,'Train', n_train)
 
         doc_tokens = sent2doc_tokens(tagged_train_sent)
@@ -98,7 +98,7 @@ def prepare_VectorBased_dataset(load, n_train, n_test):
         doc2vec_model  = create_doc2vec_model(doc_tokens)
         word2vec_model = create_word2vec_model(vocab)
 
-        print("Extracting noun phrases ...")
+        print("#Extracting noun phrases ...")
         retrieved_train_NPs = get_NP(doc_tokens)
 
         X_train, y_train = get_doc2vec_NP2vec(doc_tokens, retrieved_train_NPs, true_CPs, doc2vec_model, word2vec_model)
@@ -114,14 +114,14 @@ def prepare_VectorBased_dataset(load, n_train, n_test):
         retrieved_test_NPs = tmp_load('VB_retrieved_test_NPs')
 
     if isinstance(X_test, type(None)) or not load:
-        print('\nExtracting features from test dataset ...')
+        print('\n#Extracting features from test dataset ...')
         tagged_test_sent, true_CPs = load_tag_files(1,'Test', n_test)
 
         doc_tokens = sent2doc_tokens(tagged_test_sent)
 
         tagged_test_output = [l for s in tagged_test_sent for l in sent2labels(s)]
 
-        print("Extracting noun phrases ...")
+        print("#Extracting noun phrases ...")
         retrieved_test_NPs = get_NP(doc_tokens)
 
         X_test, y_test = get_doc2vec_NP2vec(doc_tokens, retrieved_test_NPs, true_CPs, doc2vec_model, word2vec_model)
@@ -164,11 +164,7 @@ def y2NP(y, retrieved_test_NPs):
 def tag_pred_labels(doc_tokens, pred_NPs):
 
     pred_output = []
-    start = time.time()
     for i, sents in doc_tokens.items():
-        if (i%10==0):
-            print(i, time.time()-start)
-            start = time.time()
         for j, tokens in enumerate(sents):
             for k, token in enumerate(tokens):
                 pred_output.append('O')

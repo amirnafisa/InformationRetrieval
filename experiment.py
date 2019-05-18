@@ -35,13 +35,11 @@ if __name__ == '__main__':
         X_train, y_train, X_test, y_test = IRModel.load_data()
 
         #cv_score = IRModel.cross_validate(X_train, y_train, scoring='accuracy')
-        #print("Cross Validation Score for Vector Based IR:\n",cv_score,"\n\n")
 
         IRModel.fit(X_train, y_train)
         y_pred = IRModel.predict(X_test)
         IRModel.evaluate_NP_model(y_true=y_test, y_pred=y_pred)
 
-        print("evaluating final model ...")
         IRModel.evaluate_overall_model(y_true=IRModel.get_true_tagged_output(), y_pred=IRModel.pred_tags(y_pred))
 
     if IRClass == 'CRF':
@@ -63,7 +61,7 @@ if __name__ == '__main__':
         IRModel.evaluate(y_true=y_test, y_pred=y_pred)
 
     if IRClass == 'LSTMCRF':
-        IRModel = LSTMCRFBased(False, n_train, n_test)
+        IRModel = LSTMCRFBased(True, n_train, n_test)
         X_train, y_train, X_test, y_test = IRModel.load_data()
 
         IRModel.fit(X_train, y_train)

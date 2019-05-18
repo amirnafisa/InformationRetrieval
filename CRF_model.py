@@ -21,14 +21,6 @@ class CRFBased:
 
     def load_data(self):
         X_train, y_train, X_test, y_test = prepare_crf_dataset(self.load, self.n_train, self.n_test)
-        template_str = "{:<15}"
-        template = "{:<15}"
-        for _ in range(len(X_test[3][0])):
-            template += template_str
-        for i,word_dict in enumerate(X_test[3]):
-            output = list(map(lambda t: str(t), word_dict.values())) + [y_test[3][i]]
-            print(template.format(*output[:12]))
-
         return X_train, y_train, X_test, y_test
 
 
@@ -39,27 +31,11 @@ class CRFBased:
 
     def predict(self, X): #dataset = Train or Test
         pred = self.crf.predict(X)
-        print("\nTagged 4: ",pred[3])
-
         return pred
 
     def evaluate(self, y_true, y_pred):
-        def print_transitions(trans_features):
-            for (label_from, label_to), weight in trans_features:
-                print("%-6s -> %-7s %0.6f" % (label_from, label_to, weight))
-        def print_state_features(state_features):
-            for (attr, label), weight in state_features:
-                print("%0.6f %-8s %s" % (weight, label, attr))
-
         print("Final Scores for CRF Based Modes:")
         print(flat_classification_report(y_pred=y_pred, y_true=y_true, labels=self.labels))
-
-        print("Top likely transitions:")
-        print_transitions(Counter(self.crf.transition_features_).most_common())
-
-        print("Top positive:")
-        print_state_features(Counter(self.crf.state_features_).most_common(20))
-
 
 def prepare_crf_dataset(load, n_train, n_test):
     #Extract features and create dataset
@@ -68,7 +44,7 @@ def prepare_crf_dataset(load, n_train, n_test):
         X_train = tmp_load('crf_X_train')
         y_train = tmp_load('crf_y_train')
     if not X_train or not load:
-        print('Extracting features from training dataset ...')
+        print('#Extracting features from training dataset ...')
         sent, _ = load_tag_files(1,'Train', n_train)
         tmp_save(sent,'crf_X_train_sent')
         X_train = [sent2features(s) for s in sent]
@@ -81,7 +57,7 @@ def prepare_crf_dataset(load, n_train, n_test):
         X_test = tmp_load('crf_X_test')
         y_test = tmp_load('crf_y_test')
     if not X_test or not load:
-        print('Extracting features from test dataset ...')
+        print('#Extracting features from test dataset ...')
         sent, _ = load_tag_files(1,'Test', n_test)
         tmp_save(sent,'crf_X_test_sent')
         X_test = [sent2features(s) for s in sent]

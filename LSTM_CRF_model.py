@@ -38,7 +38,7 @@ class LSTMCRFBased:
         model = Model(input, out)
         model.compile(optimizer="adam", loss=crf.loss_function, metrics=[crf.accuracy])
         self.model = model
-        history = self.model.fit(X, np.array(y), batch_size=32, epochs=5, validation_split=0.1, verbose=1)
+        history = self.model.fit(X, np.array(y), batch_size=32, epochs=20, validation_split=0.1, verbose=1)
 
     def predict(self, X): #dataset = Train or Test
         pred = []
@@ -75,7 +75,7 @@ def prepare_lstm_crf_dataset(load, max_len, n_train, n_test):
         label2idx = tmp_load('lstmcrf_label2idx')
 
     if type(X_train) == type(None) or not load:
-        print('Loading sentences training dataset ...')
+        print('#Loading sentences from training dataset ...')
         sent, _ = load_tag_files(1,'Train', n_train)
 
         vocab = list(set([w[0] for s in sent for w in s]))
@@ -88,14 +88,14 @@ def prepare_lstm_crf_dataset(load, max_len, n_train, n_test):
         label2idx = {t: i for i, t in enumerate(labels)}
 
 
-        print('Extracting features from training dataset ...')
+        print('#Extracting features from training dataset ...')
         X_train = [[word2idx[w[0]] for w in s] for s in sent]
         X_train = pad_sequences(maxlen=max_len, sequences=X_train, padding="post", value=n_vocab - 1)
         y_train = [[label2idx[w[2]] for w in s] for s in sent]
         y_train = pad_sequences(maxlen=max_len, sequences=y_train, padding="post", value=label2idx["O"])
         y_train = [to_categorical(i, num_classes=n_labels) for i in y_train]
 
-        print('Extracting features from testing dataset ...')
+        print('#Extracting features from testing dataset ...')
         sent, _ = load_tag_files(1,'Test', n_test)
 
         X_test = [[word2idx[w[0]] if w[0] in word2idx else word2idx['PADGARBAGE'] for w in s] for s in sent]
