@@ -29,14 +29,14 @@ class LSTMCRFBased:
         input = Input(shape=(self.max_len,))
         model = Embedding(input_dim=self.n_words+1, output_dim=20, input_length=self.max_len, mask_zero=True)(input)
         model = Dropout(0.1)(model)
-        model = Bidirectional(LSTM(units=25, return_sequences=True, recurrent_dropout=0.1))(model)
-        model = TimeDistributed(Dense(25, activation="relu"))(model)  # softmax output layer
+        model = Bidirectional(LSTM(units=50, return_sequences=True, recurrent_dropout=0.1))(model)
+        model = TimeDistributed(Dense(50, activation="relu"))(model)  # softmax output layer
 
         crf = CRF(self.n_labels)  # CRF layer
         out = crf(model)  # output
 
         model = Model(input, out)
-        model.compile(optimizer="rmsprop", loss=crf.loss_function, metrics=[crf.accuracy])
+        model.compile(optimizer="adam", loss=crf.loss_function, metrics=[crf.accuracy])
         self.model = model
         history = self.model.fit(X, np.array(y), batch_size=32, epochs=5, validation_split=0.1, verbose=1)
 

@@ -1,0 +1,9 @@
+#This file lists the package dependencies for the project
+nltk
+numpy
+pickle
+gensim
+keras
+sklearn
+sklearn_crfsuite
+keras_contrib
