@@ -3,35 +3,40 @@ from misc import *
 from sklearn.metrics import accuracy_score, classification_report
 import numpy as np
 from sklearn.model_selection import train_test_split
+
 from keras.models import Model, Input
 from keras.layers import LSTM, Embedding, Dense, TimeDistributed, Dropout, Bidirectional
+from keras_contrib.layers import CRF
 
-class LSTMBased:
-    '''LSTM based information retrieval.
+class LSTMCRFBased:
+    '''LSTM and CRF combined based information retrieval.
     The model is similar to the Default model
     used in homework 2 and 3'''
 
     def __init__(self, load, n_train, n_test):
         self.load = load
-        self.max_len = 50
+        self.max_len = 75
         self.n_train = int(n_train)
         self.n_test = int(n_test)
 
     def load_data(self):
-        X_train, y_train, X_test, y_test, self.words, self.labels = prepare_lstm_dataset(self.load, self.max_len, self.n_train, self.n_test)
+        X_train, y_train, X_test, y_test, self.words, self.labels, self.label2idx = prepare_lstm_crf_dataset(self.load, self.max_len, self.n_train, self.n_test)
         self.n_words = len(self.words)
         self.n_labels = len(self.labels)
         return X_train, y_train, X_test, y_test
 
     def fit(self, X, y):
         input = Input(shape=(self.max_len,))
-        model = Embedding(input_dim=self.n_words, output_dim=self.max_len, input_length=self.max_len)(input)
+        model = Embedding(input_dim=self.n_words+1, output_dim=20, input_length=self.max_len, mask_zero=True)(input)
         model = Dropout(0.1)(model)
-        model = Bidirectional(LSTM(units=100, return_sequences=True, recurrent_dropout=0.1))(model)
-        out = TimeDistributed(Dense(self.n_labels, activation="softmax"))(model)  # softmax output layer
+        model = Bidirectional(LSTM(units=25, return_sequences=True, recurrent_dropout=0.5))(model)
+        model = TimeDistributed(Dense(25, activation="relu"))(model)  # softmax output layer
+
+        crf = CRF(self.n_labels)  # CRF layer
+        out = crf(model)  # output
 
         model = Model(input, out)
-        model.compile(optimizer="rmsprop", loss="categorical_crossentropy", metrics=["accuracy"])
+        model.compile(optimizer="rmsprop", loss=crf.loss_function, metrics=[crf.accuracy])
         self.model = model
         history = self.model.fit(X, np.array(y), batch_size=32, epochs=5, validation_split=0.1, verbose=1)
 
@@ -41,25 +46,6 @@ class LSTMBased:
             pred.extend(self.model.predict(np.array([X[i]])))
 
         return pred
-
-    def cross_validate(self, X, y):
-        X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.1)
-        input = Input(shape=(self.max_len,))
-        model = Embedding(input_dim=self.n_words, output_dim=50, input_length=self.max_len)(input)
-        model = Dropout(0.1)(model)
-        model = Bidirectional(LSTM(units=100, return_sequences=True, recurrent_dropout=0.1))(model)
-        out = TimeDistributed(Dense(self.n_labels, activation="softmax"))(model)  # softmax output layer
-
-        model = Model(input, out)
-        model.compile(optimizer="rmsprop", loss="categorical_crossentropy", metrics=["accuracy"])
-        history = model.fit(X_tr, np.array(y_tr), batch_size=32, epochs=1, validation_split=0.1, verbose=1)
-
-        p = model.predict(np.array([X_te[10]]))
-        p = np.argmax(p, axis=-1)
-
-        for w, pred in zip(X_te[10], p[0]):
-            if self.words[w] != 'PADGARBAGE':
-                print("{:15}: {}".format(self.words[w], self.labels[pred]))
 
     def evaluate(self, y_true, y_pred):
         y_true = np.array([np.argmax(sent,axis=-1) for sent in y_true])
@@ -76,16 +62,17 @@ class LSTMBased:
         print("Final Scores for LSTM Based Modes:")
         print(classification_report(y_pred=y_pred, y_true=y_true, labels=['CP']))
 
-def prepare_lstm_dataset(load, max_len, n_train, n_test):
+def prepare_lstm_crf_dataset(load, max_len, n_train, n_test):
     #Extract features and create dataset
     X_train, X_test = None, None
     if load:
-        X_train = tmp_load('lstmcrf_X_train')
-        y_train = tmp_load('lstmcrf_y_train')
-        X_test = tmp_load('lstmcrf_X_test')
-        y_test = tmp_load('lstmcrf_y_test')
-        vocab = tmp_load('lstmcrf_vocab')
-        labels = tmp_load('lstmcrf_labels')
+        X_train = tmp_load('lstm_X_train')
+        y_train = tmp_load('lstm_y_train')
+        X_test = tmp_load('lstm_X_test')
+        y_test = tmp_load('lstm_y_test')
+        vocab = tmp_load('lstm_vocab')
+        labels = tmp_load('lstm_labels')
+        label2idx = tmp_load('label2idx')
 
     if type(X_train) == type(None) or not load:
         print('Loading sentences training dataset ...')
@@ -117,11 +104,12 @@ def prepare_lstm_dataset(load, max_len, n_train, n_test):
         y_test = pad_sequences(maxlen=max_len, sequences=y_test, padding="post", value=label2idx["O"])
         y_test = [to_categorical(i, num_classes=n_labels) for i in y_test]
 
-        tmp_save(X_train, 'lstmcrf_X_train')
-        tmp_save(y_train, 'lstmcrf_y_train')
-        tmp_save(vocab, 'lstmcrf_vocab')
-        tmp_save(labels, 'lstmcrf_labels')
-        tmp_save(X_test, 'lstmcrf_X_test')
-        tmp_save(y_test, 'lstmcrf_y_test')
+        tmp_save(X_train, 'lstm_X_train')
+        tmp_save(y_train, 'lstm_y_train')
+        tmp_save(vocab, 'lstm_vocab')
+        tmp_save(labels, 'lstm_labels')
+        tmp_save(X_test, 'lstm_X_test')
+        tmp_save(y_test, 'lstm_y_test')
+        tmp_save(label2idx, 'label2idx')
 
-    return X_train, y_train, X_test, y_test, vocab, labels
+    return X_train, y_train, X_test, y_test, vocab, labels, label2idx
