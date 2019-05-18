@@ -29,7 +29,7 @@ class LSTMCRFBased:
         input = Input(shape=(self.max_len,))
         model = Embedding(input_dim=self.n_words+1, output_dim=20, input_length=self.max_len, mask_zero=True)(input)
         model = Dropout(0.1)(model)
-        model = Bidirectional(LSTM(units=25, return_sequences=True, recurrent_dropout=0.5))(model)
+        model = Bidirectional(LSTM(units=25, return_sequences=True, recurrent_dropout=0.1))(model)
         model = TimeDistributed(Dense(25, activation="relu"))(model)  # softmax output layer
 
         crf = CRF(self.n_labels)  # CRF layer
@@ -66,13 +66,13 @@ def prepare_lstm_crf_dataset(load, max_len, n_train, n_test):
     #Extract features and create dataset
     X_train, X_test = None, None
     if load:
-        X_train = tmp_load('lstm_X_train')
-        y_train = tmp_load('lstm_y_train')
-        X_test = tmp_load('lstm_X_test')
-        y_test = tmp_load('lstm_y_test')
-        vocab = tmp_load('lstm_vocab')
-        labels = tmp_load('lstm_labels')
-        label2idx = tmp_load('label2idx')
+        X_train = tmp_load('lstmcrf_X_train')
+        y_train = tmp_load('lstmcrf_y_train')
+        X_test = tmp_load('lstmcrf_X_test')
+        y_test = tmp_load('lstmcrf_y_test')
+        vocab = tmp_load('lstmcrf_vocab')
+        labels = tmp_load('lstmcrf_labels')
+        label2idx = tmp_load('lstmcrf_label2idx')
 
     if type(X_train) == type(None) or not load:
         print('Loading sentences training dataset ...')
@@ -104,12 +104,12 @@ def prepare_lstm_crf_dataset(load, max_len, n_train, n_test):
         y_test = pad_sequences(maxlen=max_len, sequences=y_test, padding="post", value=label2idx["O"])
         y_test = [to_categorical(i, num_classes=n_labels) for i in y_test]
 
-        tmp_save(X_train, 'lstm_X_train')
-        tmp_save(y_train, 'lstm_y_train')
-        tmp_save(vocab, 'lstm_vocab')
-        tmp_save(labels, 'lstm_labels')
-        tmp_save(X_test, 'lstm_X_test')
-        tmp_save(y_test, 'lstm_y_test')
-        tmp_save(label2idx, 'label2idx')
+        tmp_save(X_train, 'lstmcrf_X_train')
+        tmp_save(y_train, 'lstmcrf_y_train')
+        tmp_save(vocab, 'lstmcrf_vocab')
+        tmp_save(labels, 'lstmcrf_labels')
+        tmp_save(X_test, 'lstmcrf_X_test')
+        tmp_save(y_test, 'lstmcrf_y_test')
+        tmp_save(label2idx, 'lstmcrf_label2idx')
 
     return X_train, y_train, X_test, y_test, vocab, labels, label2idx

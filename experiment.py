@@ -54,7 +54,7 @@ if __name__ == '__main__':
         IRModel.evaluate(y_true=y_test, y_pred=y_pred)
 
     if IRClass == 'LSTM':
-        IRModel = LSTMBased(False, n_train, n_test)
+        IRModel = LSTMBased(True, n_train, n_test)
         X_train, y_train, X_test, y_test = IRModel.load_data()
         #IRModel.cross_validate(X_train, y_train)
 
@@ -63,7 +63,7 @@ if __name__ == '__main__':
         IRModel.evaluate(y_true=y_test, y_pred=y_pred)
 
     if IRClass == 'LSTMCRF':
-        IRModel = LSTMCRFBased(False, n_train, n_test)
+        IRModel = LSTMCRFBased(True, n_train, n_test)
         X_train, y_train, X_test, y_test = IRModel.load_data()
 
         IRModel.fit(X_train, y_train)
